@@ -1,0 +1,54 @@
+% -------- FACTS --------
+parent(ramesh, vijay).
+parent(lata, vijay).
+parent(vijay, aditya).
+parent(pallavi, aditya).
+parent(vijay, mugdha).
+parent(pallavi, mugdha).
+% Gender information
+male(ramesh).
+male(vijay).
+male(aditya).
+female(lata).
+female(pallavi).
+female(mugdha).
+% Marriage relationship
+wife(pallavi, vijay).
+husband(vijay, pallavi).
+% -------- RULES --------
+% Father
+father(X, Y) :-
+parent(X, Y),
+male(X).
+% Mother
+mother(X, Y) :-
+parent(X, Y),
+female(X).
+% Child
+child(X, Y) :-
+parent(Y, X).
+% Son
+son(X, Y) :-
+child(X, Y),
+male(X).
+% Daughter
+daughter(X, Y) :-
+child(X, Y),
+female(X).
+% Sibling
+sibling(X, Y) :-
+parent(Z, X),
+parent(Z, Y),
+X \= Y.
+% Grandparent
+grandparent(X, Y) :-
+parent(X, Z),
+parent(Z, Y).
+% Grandfather
+grandfather(X, Y) :-
+grandparent(X, Y),
+male(X).
+% Grandmother
+grandmother(X, Y) :-
+grandparent(X, Y),
+female(X)
