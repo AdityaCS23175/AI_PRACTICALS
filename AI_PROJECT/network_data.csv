@@ -1,0 +1,11 @@
+duration,protocol_type,src_bytes,dst_bytes,label
+0,tcp,491,0,normal
+0,udp,146,0,normal
+2,tcp,232,8153,attack
+1,tcp,199,420,normal
+3,udp,0,0,attack
+2,tcp,300,500,normal
+5,icmp,0,0,attack
+1,udp,120,0,normal
+4,tcp,5000,100,attack
+2,udp,200,50,normal

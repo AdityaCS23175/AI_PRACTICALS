@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NetGuard IDS — AI-Based Intrusion Detection System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #060b14;
+      --surface:   #0d1724;
+      --border:    #1a2f4a;
+      --accent:    #00e5ff;
+      --danger:    #ff3b5c;
+      --safe:      #00ff9d;
+      --warn:      #ffb300;
+      --text:      #cde4f5;
+      --muted:     #4a7a99;
+      --glow:      0 0 18px rgba(0,229,255,0.35);
+      --glow-red:  0 0 18px rgba(255,59,92,0.45);
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-ui:   'Exo 2', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 80% 40% at 50% -10%, rgba(0,229,255,0.07) 0%, transparent 60%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,229,255,0.03) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,229,255,0.03) 40px);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 36px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(13,23,36,0.8);
+      backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      display: grid; place-items: center;
+      box-shadow: var(--glow);
+    }
+    .logo-icon svg { width: 20px; height: 20px; fill: var(--accent); }
+    .logo h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: 2px; color: var(--accent); text-shadow: var(--glow); }
+    .logo span { font-size: 0.7rem; color: var(--muted); letter-spacing: 3px; font-family: var(--font-mono); }
+    .header-status { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--safe); }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--safe); animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(0,255,157,0.5); }
+      50%      { box-shadow: 0 0 0 6px rgba(0,255,157,0); }
+    }
+
+    main { padding: 28px 36px; display: grid; gap: 24px; max-width: 1400px; margin: 0 auto; }
+
+    .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      position: relative; overflow: hidden;
+      transition: transform .2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); }
+    .stat-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 60%);
+    }
+    .stat-card .label { font-size: 0.7rem; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+    .stat-card .value { font-size: 2rem; font-weight: 800; font-family: var(--font-mono); line-height: 1; }
+    .stat-card .sub   { font-size: 0.75rem; color: var(--muted); margin-top: 4px; font-family: var(--font-mono); }
+    .stat-card.total   .value { color: var(--accent); text-shadow: var(--glow); }
+    .stat-card.attacks .value { color: var(--danger); text-shadow: var(--glow-red); }
+    .stat-card.normal  .value { color: var(--safe); }
+    .stat-card.rate    .value { color: var(--warn); }
+    .stat-accent { position: absolute; right: 18px; top: 18px; font-size: 1.6rem; opacity: 0.12; }
+
+    .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .panel-header {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--accent); font-family: var(--font-mono);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel-title::before {
+      content: ''; width: 3px; height: 14px;
+      background: var(--accent); border-radius: 2px; box-shadow: var(--glow);
+    }
+    .panel-body { padding: 22px; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field label {
+      display: block; font-size: 0.7rem; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+      font-family: var(--font-mono);
+    }
+    .field input, .field select {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      appearance: none;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,229,255,0.12);
+    }
+    .field select option { background: var(--surface); }
+
+    .btn {
+      width: 100%; margin-top: 6px;
+      padding: 13px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--font-ui);
+      font-size: 0.85rem; font-weight: 600;
+      letter-spacing: 2px; text-transform: uppercase;
+      border-radius: 8px; cursor: pointer;
+      transition: background .2s, box-shadow .2s, color .2s;
+    }
+    .btn:hover { background: var(--accent); color: var(--bg); box-shadow: var(--glow); }
+
+    .result-banner {
+      border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 14px;
+      font-family: var(--font-mono);
+      animation: slideIn .4s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .result-banner.attack { background: rgba(255,59,92,0.1); border: 1px solid rgba(255,59,92,0.4); color: var(--danger); }
+    .result-banner.normal { background: rgba(0,255,157,0.08); border: 1px solid rgba(0,255,157,0.35); color: var(--safe); }
+    .result-icon  { font-size: 1.8rem; }
+    .result-label { font-size: 1.1rem; font-weight: 700; letter-spacing: 2px; }
+    .result-conf  { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; }
+    .conf-bar-wrap { margin-top: 10px; }
+    .conf-bar-bg { height: 6px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+    .conf-bar-fill { height: 100%; border-radius: 99px; transition: width 0.8s ease; }
+    .attack .conf-bar-fill { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    .normal .conf-bar-fill { background: var(--safe);   box-shadow: 0 0 8px var(--safe); }
+
+    .chart-wrap { position: relative; height: 220px; }
+
+    .log-table-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-family: var(--font-mono); }
+    thead th {
+      padding: 8px 12px; text-align: left;
+      font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--surface);
+    }
+    tbody tr { border-bottom: 1px solid rgba(26,47,74,0.5); transition: background .15s; }
+    tbody tr:hover { background: rgba(0,229,255,0.04); }
+    tbody td { padding: 8px 12px; color: var(--text); }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 0.7rem; letter-spacing: 1px; font-weight: 600; }
+    .badge.attack { background: rgba(255,59,92,0.15); color: var(--danger); border: 1px solid rgba(255,59,92,0.3); }
+    .badge.normal { background: rgba(0,255,157,0.12); color: var(--safe);   border: 1px solid rgba(0,255,157,0.25); }
+
+    .clear-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); font-family: var(--font-mono); font-size: 0.7rem;
+      padding: 5px 12px; border-radius: 6px; cursor: pointer; letter-spacing: 1px;
+      transition: border-color .2s, color .2s;
+    }
+    .clear-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    @media (max-width: 900px) {
+      .stat-row { grid-template-columns: 1fr 1fr; }
+      .two-col, .three-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+    </div>
+    <div>
+      <h1>NETGUARD</h1>
+      <span>INTRUSION DETECTION SYSTEM</span>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="pulse"></div>
+    MONITORING ACTIVE
+  </div>
+</header>
+
+<main>
+
+  <div class="stat-row">
+    <div class="stat-card total">
+      <div class="label">Total Scanned</div>
+      <div class="value" id="s-total">{{ total }}</div>
+      <div class="sub">packets analyzed</div>
+      <div class="stat-accent">📡</div>
+    </div>
+    <div class="stat-card attacks">
+      <div class="label">Threats Detected</div>
+      <div class="value" id="s-attack">{{ attack }}</div>
+      <div class="sub">intrusion attempts</div>
+      <div class="stat-accent">⚠️</div>
+    </div>
+    <div class="stat-card normal">
+      <div class="label">Safe Traffic</div>
+      <div class="value" id="s-normal">{{ normal }}</div>
+      <div class="sub">normal packets</div>
+      <div class="stat-accent">✅</div>
+    </div>
+    <div class="stat-card rate">
+      <div class="label">Attack Rate</div>
+      <div class="value" id="s-rate">
+        {% if total > 0 %}{{ "%.1f"|format(attack / total * 100) }}%{% else %}—{% endif %}
+      </div>
+      <div class="sub">of all traffic</div>
+      <div class="stat-accent">📊</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Packet Analyzer</span>
+      </div>
+      <div class="panel-body">
+        {% if result %}
+        <div class="result-banner {{ result }}">
+          <div class="result-icon">{{ '🚨' if result == 'attack' else '🛡️' }}</div>
+          <div>
+            <div class="result-label">{{ 'INTRUSION DETECTED' if result == 'attack' else 'TRAFFIC NORMAL' }}</div>
+            <div class="result-conf">Confidence: {{ confidence }}%</div>
+            <div class="conf-bar-wrap">
+              <div class="conf-bar-bg">
+                <div class="conf-bar-fill" style="width: {{ confidence }}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        <form method="POST">
+          <div class="form-grid">
+            <div class="field">
+              <label>Duration (s)</label>
+              <input type="number" name="duration" min="0" value="0" required/>
+            </div>
+            <div class="field">
+              <label>Protocol</label>
+              <select name="protocol">
+                <option value="tcp">TCP</option>
+                <option value="udp">UDP</option>
+                <option value="icmp">ICMP</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Source Bytes</label>
+              <input type="number" name="src" min="0" value="0" required/>
+            </div>
+            <div class="field">
+              <label>Destination Bytes</label>
+              <input type="number" name="dst" min="0" value="0" required/>
+            </div>
+          </div>
+          <button type="submit" class="btn">▶ &nbsp; Analyze Packet</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Traffic Distribution</span></div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="three-col">
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Protocol Breakdown</span></div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Detection Timeline</span></div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Avg Source Bytes</span></div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="byteChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Threat Log</span>
+      <button class="clear-btn" onclick="clearLogs()">⊘ Clear Logs</button>
+    </div>
+    <div class="panel-body" style="padding:0">
+      <div class="log-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Timestamp</th><th>Duration</th><th>Protocol</th>
+              <th>Src Bytes</th><th>Dst Bytes</th><th>Confidence</th><th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in logs %}
+            <tr>
+              <td style="color:var(--muted)">{{ loop.index }}</td>
+              {% if row|length >= 7 %}
+                <td>{{ row[0] }}</td><td>{{ row[1] }}</td><td>{{ row[2]|upper }}</td>
+                <td>{{ row[3] }}</td><td>{{ row[4] }}</td><td>{{ row[6] }}%</td>
+                <td><span class="badge {{ row[5] }}">{{ row[5]|upper }}</span></td>
+              {% else %}
+                <td>—</td><td>{{ row[0] }}</td><td>{{ row[1]|upper }}</td>
+                <td>{{ row[2] }}</td><td>{{ row[3] }}</td><td>—</td>
+                <td><span class="badge {{ row[4] }}">{{ row[4]|upper }}</span></td>
+              {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No packets analyzed yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const ACCENT='#00e5ff', DANGER='#ff3b5c', SAFE='#00ff9d', WARN='#ffb300';
+  Chart.defaults.color = '#4a7a99';
+  Chart.defaults.borderColor = 'rgba(26,47,74,0.6)';
+  Chart.defaults.font.family = "'Share Tech Mono', monospace";
+
+  const donut = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Normal','Attack'],
+      datasets: [{ data: [{{ normal }},{{ attack }}],
+        backgroundColor: ['rgba(0,255,157,0.7)','rgba(255,59,92,0.7)'],
+        borderColor: [SAFE,DANGER], borderWidth: 2, hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: { legend: { position:'bottom', labels:{ padding:16, usePointStyle:true } } }
+    }
+  });
+
+  const bar = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: ['TCP','UDP','ICMP'],
+      datasets: [
+        { label:'Normal', data:[0,0,0], backgroundColor:'rgba(0,255,157,0.55)', borderColor:SAFE, borderWidth:1.5, borderRadius:4 },
+        { label:'Attack', data:[0,0,0], backgroundColor:'rgba(255,59,92,0.55)', borderColor:DANGER, borderWidth:1.5, borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'top', labels:{ usePointStyle:true } } },
+      scales: { x:{ grid:{display:false} }, y:{ beginAtZero:true, ticks:{stepSize:1} } }
+    }
+  });
+
+  const line = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label:'Attack', data:[], borderColor:DANGER, backgroundColor:'rgba(255,59,92,0.08)', fill:true, tension:0.4, pointRadius:3 },
+        { label:'Normal', data:[], borderColor:SAFE,   backgroundColor:'rgba(0,255,157,0.06)', fill:true, tension:0.4, pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'top', labels:{ usePointStyle:true } } },
+      scales: { x:{ ticks:{maxTicksLimit:6,maxRotation:0}, grid:{display:false} }, y:{ beginAtZero:true, ticks:{stepSize:1} } }
+    }
+  });
+
+  const byteBar = new Chart(document.getElementById('byteChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Normal','Attack'],
+      datasets: [{ label:'Avg Src Bytes', data:[0,0],
+        backgroundColor:['rgba(0,255,157,0.55)','rgba(255,59,92,0.55)'],
+        borderColor:[SAFE,DANGER], borderWidth:1.5, borderRadius:6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false} },
+      scales: { x:{grid:{display:false}}, y:{beginAtZero:true} }
+    }
+  });
+
+  async function refreshCharts() {
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+
+    document.getElementById('s-total').textContent  = d.total;
+    document.getElementById('s-attack').textContent = d.attack;
+    document.getElementById('s-normal').textContent = d.normal;
+    document.getElementById('s-rate').textContent   = d.total > 0 ? (d.attack/d.total*100).toFixed(1)+'%' : '—';
+
+    donut.data.datasets[0].data = [d.normal, d.attack];
+    donut.update();
+
+    const pd = d.protocol_dist;
+    bar.data.datasets[0].data = ['tcp','udp','icmp'].map(p => pd.normal&&pd.normal[p] ? pd.normal[p] : 0);
+    bar.data.datasets[1].data = ['tcp','udp','icmp'].map(p => pd.attack&&pd.attack[p] ? pd.attack[p] : 0);
+    bar.update();
+
+    if (d.timeline && d.timeline.length) {
+      const attacks={}, normals={};
+      d.timeline.forEach(e => {
+        const t = e.timestamp ? e.timestamp.slice(11,16) : '??';
+        if (e.result==='attack') attacks[t]=(attacks[t]||0)+1;
+        else                     normals[t]=(normals[t]||0)+1;
+      });
+      const labels=[...new Set(d.timeline.map(e=>e.timestamp?e.timestamp.slice(11,16):'??'))];
+      line.data.labels=labels;
+      line.data.datasets[0].data=labels.map(l=>attacks[l]||0);
+      line.data.datasets[1].data=labels.map(l=>normals[l]||0);
+      line.update();
+    }
+
+    if (d.src_stats) {
+      byteBar.data.datasets[0].data=[d.src_stats.normal||0, d.src_stats.attack||0];
+      byteBar.update();
+    }
+  }
+
+  async function clearLogs() {
+    if (!confirm('Clear all logs?')) return;
+    await fetch('/api/clear', { method:'POST' });
+    location.reload();
+  }
+
+  refreshCharts();
+  setInterval(refreshCharts, 10000);
+</script>
+
+</body>
+</html>

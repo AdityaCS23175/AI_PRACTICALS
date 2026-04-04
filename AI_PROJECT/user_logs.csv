@@ -1,0 +1,2 @@
+"timestamp","duration","protocol","src_bytes","dst_bytes","result","confidence"
+"2026-04-04 00:34:20",6,"tcp",545,444,"attack",100.0
